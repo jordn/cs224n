@@ -97,8 +97,8 @@ def get_negative_samples(target, dataset, K):
     return indices
 
 
-def negSamplingCostAndGradient(predicted, target, output_vectors, dataset, K=10):
-    """ Negative sampling cost function for word2vec models
+def neg_sampling_cost_and_gradient(predicted, target, output_vectors, dataset, K=10):
+    """Negative sampling cost function for word2vec models
 
     Implement the cost and gradients for one predicted word vector
     and one target word vector as a building block for word2vec
@@ -179,15 +179,15 @@ def skipgram(current_word, context_size, context_words, tokens, input_vectors, o
     # (through their respective mappings).
     input_embedding = input_vectors[tokens[current_word]]  # == z1 == a1 = "h"
 
-    # Unnecessary block viewing it as a neural net.
-    a1 = np.zeros((len(tokens)))
-    a1[tokens[current_word]] = 1
-    W1 = input_vectors
-    z1 = W1.T @ a1  # Equivalent to input_embedding above.
-    a2 = z1  # Hidden layer has linear activation.
-    W2 = output_vectors
-    z2 = W2 @ a2  # Equivalent np.dot(W2, a2)
-    y = softmax(z2)
+    # # Unnecessary block viewing it as a neural net.
+    # a1 = np.zeros((len(tokens)))
+    # a1[tokens[current_word]] = 1
+    # W1 = input_vectors
+    # z1 = W1.T @ a1  # Equivalent to input_embedding above.
+    # a2 = z1  # Hidden layer has linear activation.
+    # W2 = output_vectors
+    # z2 = W2 @ a2  # Equivalent np.dot(W2, a2)
+    # y = softmax(z2)
 
     for context_word in context_words:
         target = tokens[context_word]
@@ -226,16 +226,16 @@ def cbow(current_word, C, context_words, tokens, input_vectors, output_vectors,
     context_embeddings = input_vectors[[tokens[w] for w in context_words]]  # <10x3>
     input_embedding = np.sum(context_embeddings, axis=0)  # <1x3>
 
-    # Unnecessary block just viewing it as a neural net.
-    a1 = np.zeros((len(tokens)))
-    for w in context_words:
-        a1[tokens[w]] += 1
-    W1 = input_vectors
-    z1 = W1.T @ a1  # Equivalent to input_embedding above.
-    a2 = z1  # Hidden layer has linear activation.
-    W2 = output_vectors
-    z2 = W2 @ a2  # Equivalent np.dot(W2, a2)
-    y = softmax(z2)
+    # # Unnecessary block just viewing it as a neural net.
+    # a1 = np.zeros((len(tokens)))
+    # for w in context_words:
+    #     a1[tokens[w]] += 1
+    # W1 = input_vectors
+    # z1 = W1.T @ a1  # Equivalent to input_embedding above.
+    # a2 = z1  # Hidden layer has linear activation.
+    # W2 = output_vectors
+    # z2 = W2 @ a2  # Equivalent np.dot(W2, a2)
+    # y = softmax(z2)
 
     target = tokens[current_word]
     cost, _grad_pred, grad_out = word2vec_cost_and_gradient(input_embedding, target,
@@ -308,7 +308,7 @@ def test_word2vec():
         skipgram, dummy_tokens, vec, dataset, C, softmax_cost_and_gradient
     ), dummy_vectors)
     gradcheck_naive(lambda vec: word2vec_sgd_wrapper(
-        skipgram, dummy_tokens, vec, dataset, 5, negSamplingCostAndGradient),
+        skipgram, dummy_tokens, vec, dataset, 5, neg_sampling_cost_and_gradient),
                     dummy_vectors)
     print("\n==== Gradient check for CBOW      ====")
     gradcheck_naive(lambda vec: word2vec_sgd_wrapper(
@@ -316,20 +316,20 @@ def test_word2vec():
                     dummy_vectors)
 
     gradcheck_naive(lambda vec: word2vec_sgd_wrapper(
-        cbow, dummy_tokens, vec, dataset, 5, negSamplingCostAndGradient),
-        dummy_vectors)
+        cbow, dummy_tokens, vec, dataset, 5, neg_sampling_cost_and_gradient),
+                    dummy_vectors)
 
     print("\n=== Results ===")
     print(skipgram("c", 3, ["a", "b", "e", "d", "b", "c"],
                    dummy_tokens, dummy_vectors[:5, :], dummy_vectors[5:, :], dataset))
     print(skipgram("c", 1, ["a", "b"],
                    dummy_tokens, dummy_vectors[:5, :], dummy_vectors[5:, :], dataset,
-                   negSamplingCostAndGradient))
+                   neg_sampling_cost_and_gradient))
     print(cbow("a", 2, ["a", "b", "c", "a"],
                dummy_tokens, dummy_vectors[:5, :], dummy_vectors[5:, :], dataset))
     print(cbow("a", 2, ["a", "b", "a", "c"],
                dummy_tokens, dummy_vectors[:5, :], dummy_vectors[5:, :], dataset,
-               negSamplingCostAndGradient))
+               neg_sampling_cost_and_gradient))
 
 
 if __name__ == "__main__":
