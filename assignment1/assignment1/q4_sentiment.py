@@ -48,10 +48,8 @@ def getSentenceFeatures(tokens, wordVectors, sentence):
     # Output:
     # - sentVector: feature vector for the sentence
 
-    sentVector = np.zeros((wordVectors.shape[1],))
-
     ### YOUR CODE HERE
-    pass
+    sentVector = np.sum([wordVectors[tokens[w]] for w in sentence], axis=0)
     ### END YOUR CODE
 
     assert sentVector.shape == (wordVectors.shape[1],)
@@ -65,7 +63,8 @@ def getRegularizationValues():
     """
     values = None  # Assign a list of floats in the block below
     ### YOUR CODE HERE
-    raise NotImplementedError
+    values = [1e0, 1e-1, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5,
+              1e-6, 5e-7, 1e-7, 7e-8, 5e-8, 2e-8, 1e-8]
     ### END YOUR CODE
     return sorted(values)
 
@@ -86,10 +85,13 @@ def chooseBestModel(results):
     Returns:
     Your chosen result dictionary.
     """
-    bestResult = None
+    bestResult = results[0]
 
     ### YOUR CODE HERE
-    raise NotImplementedError
+    for result in results:
+        if result['dev'] > bestResult['dev']:
+            bestResult = result
+
     ### END YOUR CODE
 
     return bestResult
@@ -137,10 +139,10 @@ def outputConfusionMatrix(features, labels, clf, filename):
 def outputPredictions(dataset, features, labels, clf, filename):
     """ Write the predictions to file """
     pred = clf.predict(features)
-    with open(filename, "w") as f:
-        f.write("True\tPredicted\tText")
+    with open(filename, "w", encoding="utf-8") as f:
+        f.writelines("True\tPredicted\tText\n")
         for i in range(len(dataset)):
-            f.wriate("%d\t%d\t%s" % (labels[i], pred[i], " ".join(dataset[i][0])))
+            f.write("%d\t%d\t%s\n" % (labels[i], pred[i], " ".join(dataset[i][0])))
 
 
 def main(pretrained=False):
@@ -244,4 +246,4 @@ def main(pretrained=False):
 
 
 if __name__ == "__main__":
-    main()
+    main(pretrained=True)
