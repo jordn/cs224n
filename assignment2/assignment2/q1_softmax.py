@@ -23,11 +23,10 @@ def softmax(x):
         out: tf.Tensor with shape (n_sample, n_features). You need to construct this
                   tensor in this problem.
     """
-
     ### YOUR CODE HERE
     x_shift = x - tf.reduce_max(x)
     exp_x = tf.exp(x_shift)
-    out = exp_x/tf.reduce_sum(exp_x, axis=1, keep_dims=True)
+    out = exp_x / tf.reduce_sum(exp_x, axis=1, keep_dims=True)
     ### END YOUR CODE
 
     return out
@@ -58,9 +57,8 @@ def cross_entropy_loss(y, yhat):
     """
 
     ### YOUR CODE HERE
-    out = -tf.reduce_sum(tf.to_float(y)*tf.log(yhat))
+    out = - tf.reduce_sum(tf.to_float(y) * tf.log(yhat))
     ### END YOUR CODE
-
     return out
 
 
