@@ -124,7 +124,7 @@ def neg_sampling_cost_and_gradient(predicted, target, output_vectors, dataset, K
 
     # "Probability" in inverted commas as this is not normalised.
     prob_target = scores[0]
-    prob_negs = scores[1:]  # K "probabbilities" of neg samples.
+    prob_negs = scores[1:]  # K "probabilities" of neg samples.
 
     # Instead of minimising the cross entropy, we wish to maximise
     # the log probability of the target word and minimise the probability

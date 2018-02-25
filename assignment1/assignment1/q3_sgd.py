@@ -86,9 +86,7 @@ def sgd(f, x0, step, iterations, postprocessing=None, useSaved=False,
 
         ### YOUR CODE HERE
         cost, grad = f(x)
-
         x -= grad * step
-
         x = postprocessing(x)
         ### END YOUR CODE
 
@@ -109,7 +107,7 @@ def sgd(f, x0, step, iterations, postprocessing=None, useSaved=False,
 
 
 def sanity_check():
-    quad = lambda x: (np.sum(x ** 2), x * 2)
+    quad = lambda x: (np.sum(x ** 2), 2 * x)
 
     print("Running sanity checks...")
     t1 = sgd(f=quad, x0=0.5, step=0.01, iterations=1000, PRINT_EVERY=100)
