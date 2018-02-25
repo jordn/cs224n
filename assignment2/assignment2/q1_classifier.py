@@ -91,14 +91,12 @@ class SoftmaxModel(Model):
         Hint: For this simple use-case, it's sufficient to initialize
             both weights W and biases b with zeros.
 
-        Args:
-            input_data: A tensor of shape (batch_size, n_features).
         Returns:
             pred: A tensor of shape (batch_size, n_classes)
         """
         ### YOUR CODE HERE
         W = tf.Variable(
-            tf.zeros((self.config.n_features, self.config.n_classes)),
+            initial_value=tf.zeros((self.config.n_features, self.config.n_classes)),
             dtype=tf.float32)
         b = tf.Variable(tf.zeros(self.config.n_classes), dtype=tf.float32)
         pred = softmax(self.input_placeholder @ W + b)

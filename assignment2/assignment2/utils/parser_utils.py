@@ -2,15 +2,15 @@
 You do not need to read/understand this code
 """
 
-import time
-import os
 import logging
-from collections import Counter
-from general_utils import logged_loop, get_minibatches
-from q2_parser_transitions import PartialParse, minibatch_parse
+import time
 
 import numpy as np
+import os
+from collections import Counter
+from general_utils import get_minibatches, logged_loop
 
+from q2_parser_transitions import minibatch_parse
 
 P_PREFIX = '<p>:'
 L_PREFIX = '<l>:'
@@ -39,7 +39,7 @@ class Parser(object):
 
     def __init__(self, dataset):
         root_labels = list([l for ex in dataset
-                           for (h, l) in zip(ex['head'], ex['label']) if h == 0])
+                            for (h, l) in zip(ex['head'], ex['label']) if h == 0])
         counter = Counter(root_labels)
         if len(counter) > 1:
             logging.info('Warning: more than one root label')
@@ -71,14 +71,14 @@ class Parser(object):
 
         # logging.info('Build dictionary for part-of-speech tags.')
         tok2id.update(build_dict([P_PREFIX + w for ex in dataset for w in ex['pos']],
-                                  offset=len(tok2id)))
+                                 offset=len(tok2id)))
         tok2id[P_PREFIX + UNK] = self.P_UNK = len(tok2id)
         tok2id[P_PREFIX + NULL] = self.P_NULL = len(tok2id)
         tok2id[P_PREFIX + ROOT] = self.P_ROOT = len(tok2id)
 
         # logging.info('Build dictionary for words.')
         tok2id.update(build_dict([w for ex in dataset for w in ex['word']],
-                                  offset=len(tok2id)))
+                                 offset=len(tok2id)))
         tok2id[UNK] = self.UNK = len(tok2id)
         tok2id[NULL] = self.NULL = len(tok2id)
         tok2id[ROOT] = self.ROOT = len(tok2id)
@@ -122,9 +122,9 @@ class Parser(object):
             p_features = [self.P_NULL] * (3 - len(stack)) + [ex['pos'][x] for x in stack[-3:]]
             p_features += [ex['pos'][x] for x in buf[:3]] + [self.P_NULL] * (3 - len(buf))
 
-        for i in xrange(2):
+        for i in range(2):
             if i < len(stack):
-                k = stack[-i-1]
+                k = stack[-i - 1]
                 lc = get_lc(k)
                 rc = get_rc(k)
                 llc = get_lc(lc[0]) if len(lc) > 0 else []
@@ -178,7 +178,7 @@ class Parser(object):
             if (i1 > 0) and (h1 == i0):
                 return 0
             elif (i1 >= 0) and (h0 == i1) and \
-                 (not any([x for x in buf if ex['head'][x] == i0])):
+                    (not any([x for x in buf if ex['head'][x] == i0])):
                 return 1
             else:
                 return None if len(buf) == 0 else 2
@@ -186,7 +186,7 @@ class Parser(object):
             if (i1 > 0) and (h1 == i0):
                 return l1 if (l1 >= 0) and (l1 < self.n_deprel) else None
             elif (i1 >= 0) and (h0 == i1) and \
-                 (not any([x for x in buf if ex['head'][x] == i0])):
+                    (not any([x for x in buf if ex['head'][x] == i0])):
                 return l0 + self.n_deprel if (l0 >= 0) and (l0 < self.n_deprel) else None
             else:
                 return None if len(buf) == 0 else self.n_trans - 1
@@ -199,10 +199,10 @@ class Parser(object):
 
             # arcs = {(h, t, label)}
             stack = [0]
-            buf = [i + 1 for i in xrange(n_words)]
+            buf = [i + 1 for i in range(n_words)]
             arcs = []
             instances = []
-            for i in xrange(n_words * 2):
+            for i in range(n_words * 2):
                 gold_t = self.get_oracle(stack, buf, ex)
                 if gold_t is None:
                     break
@@ -250,11 +250,11 @@ class Parser(object):
                 head[t] = h
             for pred_h, gold_h, gold_l, pos in \
                     zip(head[1:], ex['head'][1:], ex['label'][1:], ex['pos'][1:]):
-                    assert self.id2tok[pos].startswith(P_PREFIX)
-                    pos_str = self.id2tok[pos][len(P_PREFIX):]
-                    if (self.with_punct) or (not punct(self.language, pos_str)):
-                        UAS += 1 if pred_h == gold_h else 0
-                        all_tokens += 1
+                assert self.id2tok[pos].startswith(P_PREFIX)
+                pos_str = self.id2tok[pos][len(P_PREFIX):]
+                if (self.with_punct) or (not punct(self.language, pos_str)):
+                    UAS += 1 if pred_h == gold_h else 0
+                    all_tokens += 1
         UAS /= all_tokens
         return UAS, dependencies
 
@@ -340,7 +340,7 @@ def minibatches(data, batch_size):
 def load_and_preprocess_data(reduced=True):
     config = Config()
 
-    print "Loading data...",
+    print("Loading data...", end=' ')
     start = time.time()
     train_set = read_conll(os.path.join(config.data_path, config.train_file),
                            lowercase=config.lowercase)
@@ -352,20 +352,21 @@ def load_and_preprocess_data(reduced=True):
         train_set = train_set[:1000]
         dev_set = dev_set[:500]
         test_set = test_set[:500]
-    print "took {:.2f} seconds".format(time.time() - start)
+    print("took {:.2f} seconds".format(time.time() - start))
 
-    print "Building parser...",
+    print("Building parser...", end=' ')
     start = time.time()
     parser = Parser(train_set)
-    print "took {:.2f} seconds".format(time.time() - start)
+    print("took {:.2f} seconds".format(time.time() - start))
 
-    print "Loading pretrained embeddings...",
+    print("Loading pretrained embeddings...", end=' ')
     start = time.time()
     word_vectors = {}
     for line in open(config.embedding_file).readlines():
         sp = line.strip().split()
         word_vectors[sp[0]] = [float(x) for x in sp[1:]]
-    embeddings_matrix = np.asarray(np.random.normal(0, 0.9, (parser.n_tokens, 50)), dtype='float32')
+    embeddings_matrix = np.asarray(np.random.normal(0, 0.9, (parser.n_tokens, 50)),
+                                   dtype='float32')
 
     for token in parser.tok2id:
         i = parser.tok2id[token]
@@ -373,19 +374,20 @@ def load_and_preprocess_data(reduced=True):
             embeddings_matrix[i] = word_vectors[token]
         elif token.lower() in word_vectors:
             embeddings_matrix[i] = word_vectors[token.lower()]
-    print "took {:.2f} seconds".format(time.time() - start)
+    print("took {:.2f} seconds".format(time.time() - start))
 
-    print "Vectorizing data...",
+    print("Vectorizing data...", end=' ')
     start = time.time()
     train_set = parser.vectorize(train_set)
     dev_set = parser.vectorize(dev_set)
     test_set = parser.vectorize(test_set)
-    print "took {:.2f} seconds".format(time.time() - start)
+    print("took {:.2f} seconds".format(time.time() - start))
 
-    print "Preprocessing training data..."
+    print("Preprocessing training data...")
     train_examples = parser.create_instances(train_set)
 
     return parser, embeddings_matrix, train_examples, dev_set, test_set,
+
 
 if __name__ == '__main__':
     pass
