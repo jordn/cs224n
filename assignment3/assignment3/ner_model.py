@@ -3,18 +3,17 @@
 """
 A model for named entity recognition.
 """
-import pdb
 import logging
 
-import tensorflow as tf
-from util import ConfusionMatrix, Progbar, minibatches
 from data_util import get_chunks
-from model import Model
 from defs import LBLS
+from model import Model
+from util import ConfusionMatrix, Progbar, minibatches, get_minibatches
 
 logger = logging.getLogger("hw3")
 logger.setLevel(logging.DEBUG)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 
 class NERModel(Model):
     """
@@ -43,7 +42,6 @@ class NERModel(Model):
         """
         raise NotImplementedError("Each Model must re-implement this method.")
 
-
     def evaluate(self, sess, examples, examples_raw):
         """Evaluates model performance on @examples.
 
@@ -59,7 +57,7 @@ class NERModel(Model):
         token_cm = ConfusionMatrix(labels=LBLS)
 
         correct_preds, total_correct, total_preds = 0., 0., 0.
-        for _, labels, labels_  in self.output(sess, examples_raw, examples):
+        for _, labels, labels_ in self.output(sess, examples_raw, examples):
             for l, l_ in zip(labels, labels_):
                 token_cm.update(l, l_)
             gold = set(get_chunks(labels))
@@ -72,7 +70,6 @@ class NERModel(Model):
         r = correct_preds / total_correct if correct_preds > 0 else 0
         f1 = 2 * p * r / (p + r) if correct_preds > 0 else 0
         return token_cm, (p, r, f1)
-
 
     def output(self, sess, inputs_raw, inputs=None):
         """
@@ -102,14 +99,18 @@ class NERModel(Model):
             # You may use the progress bar to monitor the training progress
             # Addition of progress bar will not be graded, but may help when debugging
             prog = Progbar(target=1 + int(len(train_examples) / self.config.batch_size))
-			
-			# The general idea is to loop over minibatches from train_examples, and run train_on_batch inside the loop
-			# Hint: train_examples could be a list containing the feature data and label data
-			# Read the doc for utils.get_minibatches to find out how to use it.
-                        # Note that get_minibatches could either return a list, or a list of list
-                        # [features, labels]. This makes expanding tuples into arguments (* operator) handy
+
+            # The general idea is to loop over minibatches from train_examples,
+            # and run train_on_batch inside the loop.
+            # Hint: train_examples could be a list containing the feature data and label data
+            # Read the doc for utils.get_minibatches to find out how to use it.
+            # Note that get_minibatches could either return a list, or a list of list
+            # [features, labels]. This makes expanding tuples into arguments (* operator) handy
 
             ### YOUR CODE HERE (2-3 lines)
+            for minibatch in minibatches(train_examples, self.config.batch_size):
+                self.train_on_batch(sess, *minibatch)
+                prog.add(1)
 
             ### END YOUR CODE
 
@@ -120,7 +121,7 @@ class NERModel(Model):
             logger.info("Entity level P/R/F1: %.2f/%.2f/%.2f", *entity_scores)
 
             score = entity_scores[-1]
-            
+
             if score > best_score:
                 best_score = score
                 if saver:

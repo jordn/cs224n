@@ -8,17 +8,19 @@ Arun Chaganty <chaganty@stanford.edu>
 
 from __future__ import division
 
+import logging
 import sys
 import time
-import logging
-import StringIO
-from collections import defaultdict, Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
+
+import io
 import numpy as np
-from numpy import array, zeros, allclose
+from numpy import allclose, array, zeros
 
 logger = logging.getLogger("hw3")
 logger.setLevel(logging.DEBUG)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 
 def read_conll(fstream):
     """
@@ -45,6 +47,7 @@ def read_conll(fstream):
         ret.append((current_toks, current_lbls))
     return ret
 
+
 def test_read_conll():
     input_ = [
         "EU	ORG",
@@ -60,13 +63,15 @@ def test_read_conll():
         "Peter	PER",
         "Blackburn	PER",
         "",
-        ]
+    ]
     output = [
-        ("EU rejects German call to boycott British lamb .".split(), "ORG O MISC O O O MISC O O".split()),
+        ("EU rejects German call to boycott British lamb .".split(),
+         "ORG O MISC O O O MISC O O".split()),
         ("Peter Blackburn".split(), "PER PER".split())
-        ]
+    ]
 
     assert read_conll(input_) == output
+
 
 def write_conll(fstream, data):
     """
@@ -79,11 +84,13 @@ def write_conll(fstream, data):
             fstream.write("\n")
         fstream.write("\n")
 
+
 def test_write_conll():
     input = [
-        ("EU rejects German call to boycott British lamb .".split(), "ORG O MISC O O O MISC O O".split()),
+        ("EU rejects German call to boycott British lamb .".split(),
+         "ORG O MISC O O O MISC O O".split()),
         ("Peter Blackburn".split(), "PER PER".split())
-        ]
+    ]
     output = """EU	ORG
 rejects	O
 German	MISC
@@ -98,10 +105,11 @@ Peter	PER
 Blackburn	PER
 
 """
-    output_ = StringIO.StringIO()
+    output_ = io.StringIO()
     write_conll(output_, input)
     output_ = output_.getvalue()
     assert output == output_
+
 
 def load_word_vector_mapping(vocab_fstream, vector_fstream):
     """
@@ -117,6 +125,7 @@ def load_word_vector_mapping(vocab_fstream, vector_fstream):
 
     return ret
 
+
 def test_load_word_vector_mapping():
     vocab = """UUUNKKK
 the
@@ -131,32 +140,45 @@ in""".split("\n")
 -0.583585 0.413481 -0.708189 0.168942 0.238435 0.789011 -0.566401 0.177570 -0.244441 0.328214 -0.319583 -0.468558 0.520323 0.072727 1.792047 -0.781348 -0.636644 0.070102 -0.247090 0.110990 0.182112 1.609935 -1.081378 0.922773 -0.605783 0.793724 0.476911 -1.279422 0.904010 -0.519837 1.235220 -0.149456 0.138923 0.686835 -0.733707 -0.335434 -1.865440 -0.476014 -0.140478 -0.148011 0.555169 1.356662 0.850737 -0.484898 0.341224 -0.056477 0.024663 1.141509 0.742001 0.478773
 -0.811262 -1.017245 0.311680 -0.437684 0.338728 1.034527 -0.415528 -0.646984 -0.121626 0.589435 -0.977225 0.099942 -1.296171 0.022671 0.946574 0.204963 0.297055 -0.394868 0.028115 -0.021189 -0.448692 0.421286 0.156809 -0.332004 0.177866 0.074233 0.299713 0.148349 1.104055 -0.172720 0.292706 0.727035 0.847151 0.024006 -0.826570 -1.038778 -0.568059 -0.460914 -1.290872 -0.294531 0.663751 -0.646503 0.499024 -0.804777 -0.402926 -0.292201 0.348031 0.215414 0.043492 0.165281
 -0.156019 0.405009 -0.370058 -1.417499 0.120639 -0.191854 -0.251213 -0.883898 -0.025010 0.150738 1.038723 0.038419 0.036411 -0.289871 0.588898 0.618994 0.087019 -0.275657 -0.105293 -0.536067 -0.181410 0.058034 0.552306 -0.389803 -0.384800 -0.470717 0.800593 -0.166609 0.702104 0.876092 0.353401 -0.314156 0.618290 0.804017 -0.925911 -1.002050 -0.231087 0.590011 -0.636952 -0.474758 0.169423 1.293482 0.609088 -0.956202 -0.013831 0.399147 0.436669 0.116759 -0.501962 1.308268
--0.008573 -0.731185 -1.108792 -0.358545 0.507277 -0.050167 0.751870 0.217678 -0.646852 -0.947062 -1.187739 0.490993 -1.500471 0.463113 1.370237 0.218072 0.213489 -0.362163 -0.758691 -0.670870 0.218470 1.641174 0.293220 0.254524 0.085781 0.464454 0.196361 -0.693989 -0.384305 -0.171888 0.045602 1.476064 0.478454 0.726961 -0.642484 -0.266562 -0.846778 0.125562 -0.787331 -0.438503 0.954193 -0.859042 -0.180915 -0.944969 -0.447460 0.036127 0.654763 0.439739 -0.038052 0.991638""".split("\n")
+-0.008573 -0.731185 -1.108792 -0.358545 0.507277 -0.050167 0.751870 0.217678 -0.646852 -0.947062 -1.187739 0.490993 -1.500471 0.463113 1.370237 0.218072 0.213489 -0.362163 -0.758691 -0.670870 0.218470 1.641174 0.293220 0.254524 0.085781 0.464454 0.196361 -0.693989 -0.384305 -0.171888 0.045602 1.476064 0.478454 0.726961 -0.642484 -0.266562 -0.846778 0.125562 -0.787331 -0.438503 0.954193 -0.859042 -0.180915 -0.944969 -0.447460 0.036127 0.654763 0.439739 -0.038052 0.991638""".split(
+        "\n")
 
     wvs = load_word_vector_mapping(vocab, vector)
     assert "UUUNKKK" in wvs
-    assert allclose(wvs["UUUNKKK"], array([0.172414, -0.091063, 0.255125, -0.837163, 0.434872, -0.499848, -0.042904, -0.059642, -0.635087, -0.458795, -0.105671, 0.506513, -0.105105, -0.405678, 0.493365, 0.408807, 0.401635, -0.817805, 0.626340, 0.580636, -0.246996, -0.008515, -0.671140, 0.301865, -0.439651, 0.247694, -0.291402, 0.873009, 0.216212, 0.145576, -0.211101, -0.352360, 0.227651, -0.118416, 0.371816, 0.261296, 0.017548, 0.596692, -0.485722, -0.369530, -0.048807, 0.017960, -0.040483, 0.111193, 0.398039, 0.162765, 0.408946, 0.005343, -0.107523, -0.079821]))
+    assert allclose(
+        wvs["UUUNKKK"], array(
+            [0.172414, -0.091063, 0.255125, -0.837163, 0.434872, -0.499848, -0.042904, -0.059642,
+             -0.635087, -0.458795, -0.105671, 0.506513, -0.105105, -0.405678, 0.493365, 0.408807,
+             0.401635, -0.817805, 0.626340, 0.580636, -0.246996, -0.008515, -0.671140, 0.301865,
+             -0.439651, 0.247694, -0.291402, 0.873009, 0.216212, 0.145576, -0.211101, -0.352360,
+             0.227651, -0.118416, 0.371816, 0.261296, 0.017548, 0.596692, -0.485722, -0.369530,
+             -0.048807, 0.017960, -0.040483, 0.111193, 0.398039, 0.162765, 0.408946, 0.005343,
+             -0.107523, -0.079821]))
     assert "the" in wvs
     assert "of" in wvs
     assert "and" in wvs
+
 
 def window_iterator(seq, n=1, beg="<s>", end="</s>"):
     """
     Iterates through seq by returning windows of length 2n+1
     """
     for i in range(len(seq)):
-        l = max(0, i-n)
-        r = min(len(seq), i+n+1)
+        l = max(0, i - n)
+        r = min(len(seq), i + n + 1)
         ret = seq[l:r]
         if i < n:
-            ret = [beg,] * (n-i) + ret
-        if i+n+1 > len(seq):
-            ret = ret + [end,] * (i+n+1 - len(seq))
+            ret = [beg, ] * (n - i) + ret
+        if i + n + 1 > len(seq):
+            ret = ret + [end, ] * (i + n + 1 - len(seq))
         yield ret
 
+
 def test_window_iterator():
-    assert list(window_iterator(list("abcd"), n=0)) == [["a",], ["b",], ["c",], ["d"]]
-    assert list(window_iterator(list("abcd"), n=1)) == [["<s>","a","b"], ["a","b","c",], ["b","c","d",], ["c", "d", "</s>",]]
+    assert list(window_iterator(list("abcd"), n=0)) == [["a", ], ["b", ], ["c", ], ["d"]]
+    assert list(window_iterator(list("abcd"), n=1)) == [["<s>", "a", "b"], ["a", "b", "c", ],
+                                                        ["b", "c", "d", ], ["c", "d", "</s>", ]]
+
 
 def one_hot(n, y):
     """
@@ -168,7 +190,7 @@ def one_hot(n, y):
         return ret
     elif isinstance(y, list):
         ret = zeros((len(y), n))
-        ret[np.arange(len(y)),y] = 1.0
+        ret[np.arange(len(y)), y] = 1.0
         return ret
     else:
         raise ValueError("Expected an int or list got: " + y)
@@ -180,19 +202,22 @@ def to_table(data, row_labels, column_labels, precision=2, digits=4):
     to display table.
     """
     # Convert data to strings
-    data = [["%04.2f"%v for v in row] for row in data]
+    data = [["%04.2f" % v for v in row] for row in data]
     cell_width = max(
         max(map(len, row_labels)),
         max(map(len, column_labels)),
         max(max(map(len, row)) for row in data))
+
     def c(s):
         """adjust cell output"""
         return s + " " * (cell_width - len(s))
+
     ret = ""
     ret += "\t".join(map(c, column_labels)) + "\n"
     for l, row in zip(row_labels, data):
         ret += "\t".join(map(c, [l] + row)) + "\n"
     return ret
+
 
 class ConfusionMatrix(object):
     """
@@ -203,7 +228,7 @@ class ConfusionMatrix(object):
 
     def __init__(self, labels, default_label=None):
         self.labels = labels
-        self.default_label = default_label if default_label is not None else len(labels) -1
+        self.default_label = default_label if default_label is not None else len(labels) - 1
         self.counts = defaultdict(Counter)
 
     def update(self, gold, guess):
@@ -213,7 +238,8 @@ class ConfusionMatrix(object):
     def as_table(self):
         """Print tables"""
         # Header
-        data = [[self.counts[l][l_] for l_,_ in enumerate(self.labels)] for l,_ in enumerate(self.labels)]
+        data = [[self.counts[l][l_] for l_, _ in enumerate(self.labels)] for l, _ in
+                enumerate(self.labels)]
         return to_table(data, self.labels, ["go\\gu"] + self.labels)
 
     def summary(self, quiet=False):
@@ -229,39 +255,41 @@ class ConfusionMatrix(object):
             tn = sum(self.counts[l_][l__] for l_ in keys if l_ != l for l__ in keys if l__ != l)
             fn = sum(self.counts[l][l_] for l_ in keys if l_ != l)
 
-            acc = (tp + tn)/(tp + tn + fp + fn) if tp > 0  else 0
-            prec = (tp)/(tp + fp) if tp > 0  else 0
-            rec = (tp)/(tp + fn) if tp > 0  else 0
-            f1 = 2 * prec * rec / (prec + rec) if tp > 0  else 0
+            acc = (tp + tn) / (tp + tn + fp + fn) if tp > 0 else 0
+            prec = (tp) / (tp + fp) if tp > 0 else 0
+            rec = (tp) / (tp + fn) if tp > 0 else 0
+            f1 = 2 * prec * rec / (prec + rec) if tp > 0 else 0
 
             # update micro/macro averages
             micro += array([tp, fp, tn, fn])
             macro += array([acc, prec, rec, f1])
-            if l != self.default_label: # Count count for everything that is not the default label!
+            if l != self.default_label:  # Count count for everything that is not the default label!
                 default += array([tp, fp, tn, fn])
 
             data.append([acc, prec, rec, f1])
 
         # micro average
         tp, fp, tn, fn = micro
-        acc = (tp + tn)/(tp + tn + fp + fn) if tp > 0  else 0
-        prec = (tp)/(tp + fp) if tp > 0  else 0
-        rec = (tp)/(tp + fn) if tp > 0  else 0
-        f1 = 2 * prec * rec / (prec + rec) if tp > 0  else 0
+        acc = (tp + tn) / (tp + tn + fp + fn) if tp > 0 else 0
+        prec = (tp) / (tp + fp) if tp > 0 else 0
+        rec = (tp) / (tp + fn) if tp > 0 else 0
+        f1 = 2 * prec * rec / (prec + rec) if tp > 0 else 0
         data.append([acc, prec, rec, f1])
         # Macro average
         data.append(macro / len(keys))
 
         # default average
         tp, fp, tn, fn = default
-        acc = (tp + tn)/(tp + tn + fp + fn) if tp > 0  else 0
-        prec = (tp)/(tp + fp) if tp > 0  else 0
-        rec = (tp)/(tp + fn) if tp > 0  else 0
-        f1 = 2 * prec * rec / (prec + rec) if tp > 0  else 0
+        acc = (tp + tn) / (tp + tn + fp + fn) if tp > 0 else 0
+        prec = (tp) / (tp + fp) if tp > 0 else 0
+        rec = (tp) / (tp + fn) if tp > 0 else 0
+        f1 = 2 * prec * rec / (prec + rec) if tp > 0 else 0
         data.append([acc, prec, rec, f1])
 
         # Macro and micro average.
-        return to_table(data, self.labels + ["micro","macro","not-O"], ["label", "acc", "prec", "rec", "f1"])
+        return to_table(data, self.labels + ["micro", "macro", "not-O"],
+                        ["label", "acc", "prec", "rec", "f1"])
+
 
 class Progbar(object):
     """
@@ -317,15 +345,15 @@ class Progbar(object):
             numdigits = int(np.floor(np.log10(self.target))) + 1
             barstr = '%%%dd/%%%dd [' % (numdigits, numdigits)
             bar = barstr % (current, self.target)
-            prog = float(current)/self.target
-            prog_width = int(self.width*prog)
+            prog = float(current) / self.target
+            prog_width = int(self.width * prog)
             if prog_width > 0:
-                bar += ('='*(prog_width-1))
+                bar += ('=' * (prog_width - 1))
                 if current < self.target:
                     bar += '>'
                 else:
                     bar += '='
-            bar += ('.'*(self.width-prog_width))
+            bar += ('.' * (self.width - prog_width))
             bar += ']'
             sys.stdout.write(bar)
             self.total_width = len(bar)
@@ -334,7 +362,7 @@ class Progbar(object):
                 time_per_unit = (now - self.start) / current
             else:
                 time_per_unit = 0
-            eta = time_per_unit*(self.target - current)
+            eta = time_per_unit * (self.target - current)
             info = ''
             if current < self.target:
                 info += ' - ETA: %ds' % eta
@@ -342,13 +370,14 @@ class Progbar(object):
                 info += ' - %ds' % (now - self.start)
             for k in self.unique_values:
                 if isinstance(self.sum_values[k], list):
-                    info += ' - %s: %.4f' % (k, self.sum_values[k][0] / max(1, self.sum_values[k][1]))
+                    info += ' - %s: %.4f' % (
+                        k, self.sum_values[k][0] / max(1, self.sum_values[k][1]))
                 else:
                     info += ' - %s: %s' % (k, self.sum_values[k])
 
             self.total_width += len(info)
             if prev_total_width > self.total_width:
-                info += ((prev_total_width-self.total_width) * " ")
+                info += ((prev_total_width - self.total_width) * " ")
 
             sys.stdout.write(info)
             sys.stdout.flush()
@@ -360,11 +389,12 @@ class Progbar(object):
             if current >= self.target:
                 info = '%ds' % (now - self.start)
                 for k in self.unique_values:
-                    info += ' - %s: %.4f' % (k, self.sum_values[k][0] / max(1, self.sum_values[k][1]))
+                    info += ' - %s: %.4f' % (
+                        k, self.sum_values[k][0] / max(1, self.sum_values[k][1]))
                 sys.stdout.write(info + "\n")
 
     def add(self, n, values=None):
-        self.update(self.seen_so_far+n, values)
+        self.update(self.seen_so_far + n, values)
 
 
 def get_minibatches(data, minibatch_size, shuffle=True):
@@ -408,13 +438,15 @@ def get_minibatches(data, minibatch_size, shuffle=True):
 def minibatch(data, minibatch_idx):
     return data[minibatch_idx] if type(data) is np.ndarray else [data[i] for i in minibatch_idx]
 
+
 def minibatches(data, batch_size, shuffle=True):
     batches = [np.array(col) for col in zip(*data)]
     return get_minibatches(batches, batch_size, shuffle)
 
-def print_sentence(output, sentence, labels, predictions):
 
-    spacings = [max(len(sentence[i]), len(labels[i]), len(predictions[i])) for i in range(len(sentence))]
+def print_sentence(output, sentence, labels, predictions):
+    spacings = [max(len(sentence[i]), len(labels[i]), len(predictions[i])) for i in
+                range(len(sentence))]
     # Compute the word spacing
     output.write("x : ")
     for token, spacing in zip(sentence, spacings):

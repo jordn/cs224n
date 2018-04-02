@@ -5,22 +5,26 @@ Q1: A window into NER
 """
 
 import argparse
+import logging
 import sys
 import time
-import logging
 from datetime import datetime
+from itertools import chain
 
 import tensorflow as tf
+from tensorflow.contrib.layers import l2_regularizer
 
-from util import print_sentence, write_conll
-from data_util import load_and_preprocess_data, load_embeddings, read_conll, ModelHelper
-from ner_model import NERModel
+from data_util import ModelHelper, load_and_preprocess_data, load_embeddings, read_conll
 from defs import LBLS
-#from report import Report
+from ner_model import NERModel
+from util import print_sentence, write_conll
+
+# from report import Report
 
 logger = logging.getLogger("hw3.q1")
 logger.setLevel(logging.DEBUG)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 
 class Config:
     """Holds model hyperparams and data information.
@@ -31,10 +35,11 @@ class Config:
 
     TODO: Fill in what n_window_features should be, using n_word_features and window_size.
     """
-    n_word_features = 2 # Number of features for every word in the input.
-    window_size = 1 # The size of the window to use.
+    n_word_features = 2  # Number of features for every word in the input.
+    window_size = 1  # The size of the window to use.
     ### YOUR CODE HERE
-    n_window_features = 0 # The total number of features used for each window.
+    # The total number of features used for each window.
+    n_window_features = n_word_features * (2 * window_size + 1)
     ### END YOUR CODE
     n_classes = 5
     dropout = 0.5
@@ -43,6 +48,7 @@ class Config:
     batch_size = 2048
     n_epochs = 10
     lr = 0.001
+    l2reg = 1e-6
 
     def __init__(self, output_path=None):
         if output_path:
@@ -56,7 +62,7 @@ class Config:
         self.conll_output = self.output_path + "window_predictions.conll"
 
 
-def make_windowed_data(data, start, end, window_size = 1):
+def make_windowed_data(data, start, end, window_size=1):
     """Uses the input sequences in @data to construct new windowed data points.
 
     TODO: In the code below, construct a window from each word in the
@@ -93,17 +99,23 @@ def make_windowed_data(data, start, end, window_size = 1):
 
     windowed_data = []
     for sentence, labels in data:
-		### YOUR CODE HERE (5-20 lines)
-
-		### END YOUR CODE
+        # YOUR CODE HERE (5-20 lines)
+        padded = ([start for _ in range(window_size)] +
+                  sentence +
+                  [end for _ in range(window_size)])
+        for i in range(len(padded) - 2 * window_size):
+            window = padded[i:i + 1 + 2 * window_size]
+            windowed_data.append((list(chain(*window)), labels[i]))
+        # END YOUR CODE
     return windowed_data
+
 
 class WindowModel(NERModel):
     """
     Implements a feedforward neural network with an embedding layer and
     single hidden layer.
     This network will predict what label (e.g. PER) should be given to a
-    given token (e.g. Manning) by  using a featurized window around the token.
+    given token (e.g. Manning) by using a featurized window around the token.
     """
 
     def add_placeholders(self):
@@ -127,7 +139,18 @@ class WindowModel(NERModel):
         (Don't change the variable names)
         """
         ### YOUR CODE HERE (~3-5 lines)
-
+        self.input_placeholder = tf.placeholder(
+            name='input',
+            shape=(None, self.config.n_window_features),
+            dtype=tf.int32)
+        self.labels_placeholder = tf.placeholder(
+            name='labels',
+            shape=(None,),
+            dtype=tf.int32)
+        self.dropout_placeholder = tf.placeholder(
+            name='dropout_val',
+            shape=None,
+            dtype=tf.float32)
         ### END YOUR CODE
 
     def create_feed_dict(self, inputs_batch, labels_batch=None, dropout=1):
@@ -149,9 +172,14 @@ class WindowModel(NERModel):
         Returns:
             feed_dict: The feed dictionary mapping from placeholders to values.
         """
-        ### YOUR CODE HERE (~5-10 lines)
-
-        ### END YOUR CODE
+        #  YOUR CODE HERE (~5-10 lines)
+        feed_dict = {
+            self.input_placeholder: inputs_batch,
+            self.dropout_placeholder: dropout,
+        }
+        if labels_batch is not None:
+            feed_dict[self.labels_placeholder] = labels_batch
+        # END YOUR CODE
         return feed_dict
 
     def add_embedding(self):
@@ -170,10 +198,16 @@ class WindowModel(NERModel):
         Returns:
             embeddings: tf.Tensor of shape (None, n_window_features*embed_size)
         """
-        ### YOUR CODE HERE (!3-5 lines)
-
-
-
+        ### YOUR CODE HERE (~3-5 lines)
+        all_embeddings = tf.get_variable(
+            name='embeddings',
+            initializer=tf.constant(self.pretrained_embeddings))
+        embeddings = tf.nn.embedding_lookup(
+            params=all_embeddings,
+            ids=self.input_placeholder)
+        embeddings = tf.reshape(
+            tensor=embeddings,
+            shape=(-1, self.config.n_window_features * self.config.embed_size))
         ### END YOUR CODE
         return embeddings
 
@@ -204,7 +238,34 @@ class WindowModel(NERModel):
         x = self.add_embedding()
         dropout_rate = self.dropout_placeholder
         ### YOUR CODE HERE (~10-20 lines)
+        ### YOUR CODE HERE
+        W = tf.get_variable(
+            name="W",
+            initializer=tf.contrib.layers.xavier_initializer(),
+            shape=(
+                self.config.n_window_features * self.config.embed_size, self.config.hidden_size),
+            dtype=tf.float32,
+            regularizer=l2_regularizer(self.config.l2reg))
+        b1 = tf.get_variable(
+            name="b1",
+            initializer=tf.zeros_initializer,
+            shape=self.config.hidden_size,
+            dtype=tf.float32)
+        U = tf.get_variable(
+            initializer=tf.contrib.layers.xavier_initializer(),
+            shape=(self.config.hidden_size, self.config.n_classes),
+            dtype=tf.float32,
+            name="U",
+            regularizer=l2_regularizer(self.config.l2reg))
+        b2 = tf.get_variable(
+            name="b2",
+            initializer=tf.zeros_initializer,
+            shape=self.config.n_classes,
+            dtype=tf.float32)
 
+        h = tf.nn.relu(x @ W + b1)
+        h_drop = tf.nn.dropout(h, self.dropout_placeholder)
+        pred = h_drop @ U + b2
         ### END YOUR CODE
         return pred
 
@@ -222,7 +283,10 @@ class WindowModel(NERModel):
             loss: A 0-d tensor (scalar)
         """
         ### YOUR CODE HERE (~2-5 lines)
-
+        softmax_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.labels_placeholder, logits=self.pred)
+        reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        loss = tf.reduce_mean(softmax_loss) + sum(reg_loss)
         ### END YOUR CODE
         return loss
 
@@ -246,21 +310,23 @@ class WindowModel(NERModel):
             train_op: The Op for training.
         """
         ### YOUR CODE HERE (~1-2 lines)
-
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.config.lr)
+        train_op = optimizer.minimize(loss)
         ### END YOUR CODE
         return train_op
 
     def preprocess_sequence_data(self, examples):
-        return make_windowed_data(examples, start=self.helper.START, end=self.helper.END, window_size=self.config.window_size)
+        return make_windowed_data(examples, start=self.helper.START, end=self.helper.END,
+                                  window_size=self.config.window_size)
 
     def consolidate_predictions(self, examples_raw, examples, preds):
         """Batch the predictions into groups of sentence length.
         """
         ret = []
-        #pdb.set_trace()
+        # pdb.set_trace()
         i = 0
         for sentence, labels in examples_raw:
-            labels_ = preds[i:i+len(sentence)]
+            labels_ = preds[i:i + len(sentence)]
             i += len(sentence)
             ret.append([sentence, labels, labels_])
         return ret
@@ -297,23 +363,25 @@ class WindowModel(NERModel):
 
 
 def test_make_windowed_data():
-    sentences = [[[1,1], [2,0], [3,3]]]
+    sentences = [[[1, 1], [2, 0], [3, 3]]]
     sentence_labels = [[1, 2, 3]]
     data = zip(sentences, sentence_labels)
-    w_data = make_windowed_data(data, start=[5,0], end=[6,0], window_size=1)
+    w_data = make_windowed_data(data, start=[5, 0], end=[6, 0], window_size=1)
 
     assert len(w_data) == sum(len(sentence) for sentence in sentences)
 
     assert w_data == [
-        ([5,0] + [1,1] + [2,0], 1,),
-        ([1,1] + [2,0] + [3,3], 2,),
-        ([2,0] + [3,3] + [6,0], 3,),
-        ]
+        ([5, 0] + [1, 1] + [2, 0], 1,),
+        ([1, 1] + [2, 0] + [3, 3], 2,),
+        ([2, 0] + [3, 3] + [6, 0], 3,),
+    ]
+
 
 def do_test1(_):
     logger.info("Testing make_windowed_data")
     test_make_windowed_data()
     logger.info("Passed!")
+
 
 def do_test2(args):
     logger.info("Testing implementation of WindowModel")
@@ -323,7 +391,7 @@ def do_test2(args):
     config.embed_size = embeddings.shape[1]
 
     with tf.Graph().as_default():
-        logger.info("Building model...",)
+        logger.info("Building model...", )
         start = time.time()
         model = WindowModel(helper, config, embeddings)
         logger.info("took %.2f seconds", time.time() - start)
@@ -338,6 +406,7 @@ def do_test2(args):
     logger.info("Model did not crash!")
     logger.info("Passed!")
 
+
 def do_train(args):
     # Set up some parameters.
     config = Config()
@@ -351,10 +420,10 @@ def do_train(args):
     handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s'))
     logging.getLogger().addHandler(handler)
 
-    report = None #Report(Config.eval_output)
+    report = None  # Report(Config.eval_output)
 
     with tf.Graph().as_default():
-        logger.info("Building model...",)
+        logger.info("Building model...", )
         start = time.time()
         model = WindowModel(helper, config, embeddings)
         logger.info("took %.2f seconds", time.time() - start)
@@ -381,6 +450,7 @@ def do_train(args):
                     for sentence, labels, predictions in output:
                         print_sentence(f, sentence, labels, predictions)
 
+
 def do_evaluate(args):
     config = Config(args.model_path)
     helper = ModelHelper.load(args.model_path)
@@ -389,7 +459,7 @@ def do_evaluate(args):
     config.embed_size = embeddings.shape[1]
 
     with tf.Graph().as_default():
-        logger.info("Building model...",)
+        logger.info("Building model...", )
         start = time.time()
         model = WindowModel(helper, config, embeddings)
 
@@ -405,6 +475,7 @@ def do_evaluate(args):
                 predictions = [LBLS[l] for l in predictions]
                 print_sentence(args.output, sentence, labels, predictions)
 
+
 def do_shell(args):
     config = Config(args.model_path)
     helper = ModelHelper.load(args.model_path)
@@ -412,7 +483,7 @@ def do_shell(args):
     config.embed_size = embeddings.shape[1]
 
     with tf.Graph().as_default():
-        logger.info("Building model...",)
+        logger.info("Building model...", )
         start = time.time()
         model = WindowModel(helper, config, embeddings)
         logger.info("took %.2f seconds", time.time() - start)
@@ -432,16 +503,21 @@ input> Germany 's representative to the European Union 's veterinary committee .
             while True:
                 # Create simple REPL
                 try:
-                    sentence = input("input> ", raw=True)
+                    sentence = input("input> ")
+                    if not sentence:
+                        continue
                     tokens = sentence.strip().split(" ")
-                    for sentence, _, predictions in model.output(session, [(tokens, ["O"] * len(tokens))]):
+                    for sentence, _, predictions in model.output(
+                            session, [(tokens, ["O"] * len(tokens))]):
                         predictions = [LBLS[l] for l in predictions]
                         print_sentence(sys.stdout, sentence, [""] * len(tokens), predictions)
                 except EOFError:
                     print("Closing session.")
                     break
 
+
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description='Trains and tests an NER model')
     subparsers = parser.add_subparsers()
 
@@ -449,31 +525,45 @@ if __name__ == "__main__":
     command_parser.set_defaults(func=do_test1)
 
     command_parser = subparsers.add_parser('test2', help='')
-    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'), default="data/tiny.conll", help="Training data")
-    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'), default="data/tiny.conll", help="Dev data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'),
+                                default="data/tiny.conll", help="Training data")
+    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'),
+                                default="data/tiny.conll", help="Dev data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
     command_parser.set_defaults(func=do_test2)
 
     command_parser = subparsers.add_parser('train', help='')
-    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'), default="data/train.conll", help="Training data")
-    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'), default="data/dev.conll", help="Dev data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'),
+                                default="data/train.conll", help="Training data")
+    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'),
+                                default="data/dev.conll", help="Dev data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
     command_parser.set_defaults(func=do_train)
 
     command_parser = subparsers.add_parser('evaluate', help='')
-    command_parser.add_argument('-d', '--data', type=argparse.FileType('r'), default="data/dev.conll", help="Training data")
+    command_parser.add_argument('-d', '--data', type=argparse.FileType('r'),
+                                default="data/dev.conll", help="Training data")
     command_parser.add_argument('-m', '--model-path', help="Training data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
-    command_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout, help="Training data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout,
+                                help="Training data")
     command_parser.set_defaults(func=do_evaluate)
 
     command_parser = subparsers.add_parser('shell', help='')
     command_parser.add_argument('-m', '--model-path', help="Training data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
     command_parser.set_defaults(func=do_shell)
 
     ARGS = parser.parse_args()
