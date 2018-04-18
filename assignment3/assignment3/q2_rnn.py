@@ -3,10 +3,6 @@
 """
 Q2: Recurrent neural nets for NER
 """
-
-from __future__ import absolute_import
-from __future__ import division
-
 import argparse
 import logging
 import sys
@@ -14,18 +10,18 @@ import time
 from datetime import datetime
 
 import tensorflow as tf
-import numpy as np
 
-from util import print_sentence, write_conll, read_conll
-from data_util import load_and_preprocess_data, load_embeddings, ModelHelper
-from ner_model import NERModel
+from data_util import ModelHelper, load_and_preprocess_data, load_embeddings
 from defs import LBLS
+from ner_model import NERModel
 from q2_rnn_cell import RNNCell
 from q3_gru_cell import GRUCell
+from util import print_sentence, read_conll, write_conll
 
 logger = logging.getLogger("hw3.q2")
 logger.setLevel(logging.DEBUG)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 
 class Config:
     """Holds model hyperparams and data information.
@@ -34,10 +30,12 @@ class Config:
     information parameters. Model objects are passed a Config() object at
     instantiation.
     """
-    n_word_features = 2 # Number of features for every word in the input.
+    n_word_features = 2  # Number of features for every word in the input.
     window_size = 1
-    n_features = (2 * window_size + 1) * n_word_features # Number of features for every word in the input.
-    max_length = 120 # longest sequence to parse
+    # Number of features for every word in the input.
+    n_features = (2 * window_size + 1) * n_word_features
+    # longest sequence to parse
+    max_length = 120
     n_classes = 5
     dropout = 0.5
     embed_size = 50
@@ -77,8 +75,8 @@ def pad_sequences(data, max_length):
     Example: for the (sentence, labels) pair: [[4,1], [6,0], [7,0]], [1,
     0, 0], and max_length = 5, we would construct
         - a new sentence: [[4,1], [6,0], [7,0], [0,0], [0,0]]
-        - a new label seqeunce: [1, 0, 0, 4, 4], and
-        - a masking seqeunce: [True, True, True, False, False].
+        - a new label sequence: [1, 0, 0, 4, 4], and
+        - a masking sequence: [True, True, True, False, False].
 
     Args:
         data: is a list of (sentence, labels) tuples. @sentence is a list
@@ -88,7 +86,7 @@ def pad_sequences(data, max_length):
             Manning is amazing" and labels "PER PER O O" would become
             ([[1,9], [2,9], [3,8], [4,8]], [1, 1, 4, 4]). Here "Chris"
             the word has been featurized as "[1, 9]", and "[1, 1, 4, 4]"
-            is the list of labels. 
+            is the list of labels.
         max_length: the desired length for all input/output sequences.
     Returns:
         a new list of data points of the structure (sentence', labels', mask).
@@ -141,6 +139,7 @@ class RNNModel(NERModel):
         (Don't change the variable names)
         """
         ### YOUR CODE HERE (~4-6 lines)
+        self.input_placeholder
         ### END YOUR CODE
 
     def create_feed_dict(self, inputs_batch, mask_batch, labels_batch=None, dropout=1):
@@ -166,6 +165,13 @@ class RNNModel(NERModel):
             feed_dict: The feed dictionary mapping from placeholders to values.
         """
         ### YOUR CODE (~6-10 lines)
+        feed_dict = {
+            self.input_placeholder: inputs_batch,
+            self.mask_placeholder: mask_batch,
+            self.dropout_placeholder: dropout
+        }
+        if labels_batch:
+            feed_dict[self.labels_placeholder] = labels_batch
         ### END YOUR CODE
         return feed_dict
 
@@ -190,6 +196,15 @@ class RNNModel(NERModel):
             embeddings: tf.Tensor of shape (None, max_length, n_features*embed_size)
         """
         ### YOUR CODE HERE (~4-6 lines)
+        all_embeddings = tf.get_variable(
+            name='embeddings',
+            initializer=tf.constant(self.pretrained_embeddings))
+        embeddings = tf.nn.embedding_lookup(
+            params=all_embeddings,
+            ids=self.input_placeholder)
+        embeddings = tf.reshape(
+            tensor=embeddings,
+            shape=(-1, self.config.n_window_features * self.config.embed_size))
         ### END YOUR CODE
         return embeddings
 
@@ -263,7 +278,11 @@ class RNNModel(NERModel):
         ### YOUR CODE HERE (~2-4 lines)
         ### END YOUR CODE
 
-        assert preds.get_shape().as_list() == [None, self.max_length, self.config.n_classes], "predictions are not of the right shape. Expected {}, got {}".format([None, self.max_length, self.config.n_classes], preds.get_shape().as_list())
+        if preds.get_shape().as_list() != [None, self.max_length, self.config.n_classes]:
+            raise ValueError("predictions are not of the right shape. Expected "
+                             "{}, got {}".format(
+                [None, self.max_length, self.config.n_classes],
+                preds.get_shape().as_list())
         return preds
 
     def add_loss_op(self, preds):
@@ -375,11 +394,14 @@ def test_pad_sequences():
         ]
 
     ret_ = pad_sequences(data, 4)
-    assert len(ret_) == 2, "Did not process all examples: expected {} results, but got {}.".format(2, len(ret_))
+    assert len(ret_) == 2, "Did not process all examples: expected {} " \
+                           "results, but got {}.".format(2, len(ret_))
     for i in range(2):
-        assert len(ret_[i]) == 3, "Did not populate return values corrected: expected {} items, but got {}.".format(3, len(ret_[i]))
+        assert len(ret_[i]) == 3, "Did not populate return values corrected:" \
+                                  " expected {} items, but got {}.".format(3, len(ret_[i]))
         for j in range(3):
-            assert ret_[i][j] == ret[i][j], "Expected {}, but got {} for {}-th entry of {}-th example".format(ret[i][j], ret_[i][j], j, i)
+            assert ret_[i][j] == ret[i][j], "Expected {}, but got {} for {}-th" \
+                                            " entry of {}-th example".format(ret[i][j], ret_[i][j], j, i)
 
 def do_test1(_):
     logger.info("Testing pad_sequences")
@@ -503,7 +525,7 @@ input> Germany 's representative to the European Union 's veterinary committee .
             while True:
                 # Create simple REPL
                 try:
-                    sentence = raw_input("input> ")
+                    sentence = input("input> ")
                     tokens = sentence.strip().split(" ")
                     for sentence, _, predictions in model.output(session, [(tokens, ["O"] * len(tokens))]):
                         predictions = [LBLS[l] for l in predictions]
@@ -520,35 +542,53 @@ if __name__ == "__main__":
     command_parser.set_defaults(func=do_test1)
 
     command_parser = subparsers.add_parser('test2', help='')
-    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'), default="data/tiny.conll", help="Training data")
-    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'), default="data/tiny.conll", help="Dev data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
-    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn", help="Type of RNN cell to use.")
+    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'),
+                                default="data/tiny.conll", help="Training data")
+    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'),
+                                default="data/tiny.conll", help="Dev data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn",
+                                help="Type of RNN cell to use.")
     command_parser.set_defaults(func=do_test2)
 
     command_parser = subparsers.add_parser('train', help='')
-    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'), default="data/train.conll", help="Training data")
-    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'), default="data/dev.conll", help="Dev data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
-    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn", help="Type of RNN cell to use.")
+    command_parser.add_argument('-dt', '--data-train', type=argparse.FileType('r'),
+                                default="data/train.conll", help="Training data")
+    command_parser.add_argument('-dd', '--data-dev', type=argparse.FileType('r'),
+                                default="data/dev.conll", help="Dev data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn",
+                                help="Type of RNN cell to use.")
     command_parser.set_defaults(func=do_train)
 
     command_parser = subparsers.add_parser('evaluate', help='')
-    command_parser.add_argument('-d', '--data', type=argparse.FileType('r'), default="data/dev.conll", help="Training data")
+    command_parser.add_argument('-d', '--data', type=argparse.FileType('r'),
+                                default="data/dev.conll", help="Training data")
     command_parser.add_argument('-m', '--model-path', help="Training data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
-    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn", help="Type of RNN cell to use.")
-    command_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout, help="Training data")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn",
+                                help="Type of RNN cell to use.")
+    command_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout,
+                                help="Training data")
     command_parser.set_defaults(func=do_evaluate)
 
     command_parser = subparsers.add_parser('shell', help='')
     command_parser.add_argument('-m', '--model-path', help="Training data")
-    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'), default="data/vocab.txt", help="Path to vocabulary file")
-    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'), default="data/wordVectors.txt", help="Path to word vectors file")
-    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn", help="Type of RNN cell to use.")
+    command_parser.add_argument('-v', '--vocab', type=argparse.FileType('r'),
+                                default="data/vocab.txt", help="Path to vocabulary file")
+    command_parser.add_argument('-vv', '--vectors', type=argparse.FileType('r'),
+                                default="data/wordVectors.txt", help="Path to word vectors file")
+    command_parser.add_argument('-c', '--cell', choices=["rnn", "gru"], default="rnn",
+                                help="Type of RNN cell to use.")
     command_parser.set_defaults(func=do_shell)
 
     ARGS = parser.parse_args()
